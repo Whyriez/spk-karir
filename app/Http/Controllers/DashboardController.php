@@ -12,10 +12,29 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        // Pastikan hanya Admin/Pakar yang lihat data lengkap
-        // Siswa hanya akan melihat dashboard sederhana atau redirect ke hasil
-        if (Auth::user()->role === 'siswa') {
-            return to_route('siswa.input');
+        $user = Auth::user();
+
+        if ($user->role === 'siswa') {
+            // AMBIL DATA HISTORY UNTUK GRAFIK
+            $history = HasilRekomendasi::with('periode')
+                ->where('siswa_id', $user->id)
+                ->orderBy('periode_id', 'asc') // Urutkan dari periode lama ke baru
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'id' => $item->id,
+                        'label' => $item->periode->nama_periode, // "Kelas 10", "Kelas 11"
+                        'kelas' => $item->tingkat_kelas,
+                        'skor_studi' => $item->skor_studi,
+                        'skor_kerja' => $item->skor_kerja,
+                        'skor_wirausaha' => $item->skor_wirausaha,
+                        'keputusan' => $item->keputusan_terbaik,
+                    ];
+                });
+
+            return Inertia::render('Dashboard', [
+                'history' => $history // Kirim ke React
+            ]);
         }
 
         // 1. Hitung Statistik untuk Cards (Sesuai Gambar 3.5)

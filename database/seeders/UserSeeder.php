@@ -2,50 +2,84 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class UserSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        // 1. Akun Admin (Guru BK)
+        // 1. Akun Admin (Super User)
+        // Tugas: Buka Periode, Manajemen User, CRUD Kriteria
         DB::table('users')->insert([
-            'name' => 'Administrator BK',
+            'name' => 'Administrator Sistem',
             'email' => 'admin@smk.id',
             'username' => 'admin',
-            'password' => Hash::make('password'), // password default
+            'password' => Hash::make('123'),
             'role' => 'admin',
-            'created_at' => now(), 'updated_at' => now()
+            'jenis_pakar' => null, // Admin bukan pakar spesifik
+            'created_at' => now(), 
+            'updated_at' => now()
         ]);
 
-        // 2. Akun Pakar (Kaprodi / Guru Senior)
+        // 2. Akun Pakar 1: GURU BK
+        // Tugas: Input Bobot BWM untuk kriteria 'gurubk' (Minat, Psikologis)
         DB::table('users')->insert([
-            'name' => 'Pakar Penilai',
-            'email' => 'pakar@smk.id',
-            'username' => 'pakar',
-            'password' => Hash::make('password'),
+            'name' => 'Ibu Guru BK',
+            'email' => 'gurubk@smk.id',
+            'username' => 'gurubk',
+            'password' => Hash::make('123'),
             'role' => 'pakar',
-            'created_at' => now(), 'updated_at' => now()
+            'jenis_pakar' => 'gurubk', // <--- PENTING
+            'created_at' => now(), 
+            'updated_at' => now()
         ]);
 
-        // 3. Akun Siswa (Contoh)
-        // Pastikan ID Jurusan 1 (TKJ) sudah ada dari JurusanSeeder
+        // 3. Akun Pakar 2: KAPRODI
+        // Tugas: Input Bobot BWM untuk kriteria 'kaprodi' (Gaji, Lapangan Kerja)
         DB::table('users')->insert([
-            'name' => 'Alim Suma',
-            'username' => '531422058', // Login pakai NISN
+            'name' => 'Bapak Kaprodi TKJ',
+            'email' => 'kaprodi@smk.id',
+            'username' => 'kaprodi',
+            'password' => Hash::make('123'),
+            'role' => 'pakar',
+            'jenis_pakar' => 'kaprodi', // <--- PENTING
+            'jurusan_id' => 1,
+            'created_at' => now(), 
+            'updated_at' => now()
+        ]);
+
+        // 4. Akun Siswa 1: KELAS 12 (Siap Lulus)
+        // Tugas: Simulasi melihat hasil akhir
+        DB::table('users')->insert([
+            'name' => 'Alim Suma (Kls 12)',
+            'username' => 'siswa12', 
             'email' => 'alim@student.ung.ac.id',
-            'password' => Hash::make('password'),
+            'password' => Hash::make('123'),
             'role' => 'siswa',
+            'jenis_pakar' => null,
             'nisn' => '531422058',
-            'jurusan_id' => 1, // Asumsi 1 adalah TKJ
-            'asal_sekolah' => 'SMKN 1 Kota Gorontalo',
-            'created_at' => now(), 'updated_at' => now()
+            'jurusan_id' => 1, 
+            'kelas_saat_ini' => '12', // <--- Simulasi siswa tingkat akhir
+            'created_at' => now(), 
+            'updated_at' => now()
+        ]);
+
+        // 5. Akun Siswa 2: KELAS 10 (Siswa Baru)
+        // Tugas: Simulasi fitur 'Promosi Kenaikan Kelas'
+        DB::table('users')->insert([
+            'name' => 'Budi Santoso (Kls 10)',
+            'username' => 'siswa10', 
+            'email' => 'budi@smk.id',
+            'password' => Hash::make('123'),
+            'role' => 'siswa',
+            'jenis_pakar' => null,
+            'nisn' => '123456789',
+            'jurusan_id' => 1, 
+            'kelas_saat_ini' => '10', // <--- Simulasi siswa baru
+            'created_at' => now(), 
+            'updated_at' => now()
         ]);
     }
 }

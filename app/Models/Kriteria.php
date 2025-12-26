@@ -10,5 +10,19 @@ class Kriteria extends Model
 {
     use HasFactory;
     protected $table = 'kriteria';
-    protected $fillable = ['kode', 'nama', 'atribut', 'bobot_bwm', 'is_static'];
+    protected $fillable = [
+        'kode',
+        'nama',
+        'pertanyaan',
+        'atribut',
+        'bobot_bwm',
+        'tipe_input',
+        'opsi_pilihan',
+        'kategori',
+        'penanggung_jawab',
+    ];
+
+    protected $casts = [
+        'opsi_pilihan' => 'array', // Otomatis convert JSON DB ke Array PHP/JS
+    ];
 }

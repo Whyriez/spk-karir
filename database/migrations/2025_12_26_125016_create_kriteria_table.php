@@ -13,17 +13,24 @@ return new class extends Migration
     {
         Schema::create('kriteria', function (Blueprint $table) {
             $table->id();
-            $table->string('kode')->unique(); // C1, C2, dst
-            $table->string('nama'); // Nilai Akademik, Minat Studi, dst
-            
+            $table->string('kode')->unique();
+            $table->string('nama');
+            $table->text('pertanyaan')->nullable();
+
+            // --- TAMBAHAN BARU: DEFINISI UI DARI DATABASE ---
+            // 1. Tipe Input: number (angka), select (dropdown), likert (radio 1-5)
+            $table->enum('tipe_input', ['number', 'select', 'likert'])->default('likert');
+
+            // 2. Opsi Pilihan: Menyimpan opsi dropdown dalam format JSON (misal untuk Ekonomi)
+            $table->json('opsi_pilihan')->nullable();
+            // ------------------------------------------------
+
             $table->enum('atribut', ['benefit', 'cost'])->default('benefit');
-            
-            // Menyimpan hasil hitungan bobot BWM nanti
             $table->float('bobot_bwm')->nullable();
-            
-            // Penanda apakah nilai diambil otomatis (seperti C1 Raport) atau Kuesioner
-            $table->boolean('is_static')->default(false); 
-            
+
+            // Kita ganti 'is_static' menjadi 'kategori' agar lebih jelas pengelompokannya di UI
+            $table->enum('kategori', ['akademik', 'kuesioner'])->default('kuesioner');
+
             $table->timestamps();
         });
     }

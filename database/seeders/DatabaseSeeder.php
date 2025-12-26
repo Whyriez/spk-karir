@@ -17,6 +17,12 @@ class DatabaseSeeder extends Seeder
             JurusanSeeder::class,
             KriteriaSeeder::class,
             UserSeeder::class,
+            HistorySeeder::class,
         ]);
+
+        \App\Models\Setting::updateOrCreate(
+            ['key' => 'nama_sekolah'],
+            ['value' => 'SMKN 1 Gorontalo'] // Default
+        );
     }
 }

@@ -22,10 +22,11 @@ class User extends Authenticatable
         'email',
         'password',
         'username',
-        'role',         // admin, pakar, siswa
+        'role',
+        'jenis_pakar',
         'nisn',         // khusus siswa
         'jurusan_id',   // relasi ke jurusan
-        'asal_sekolah',
+        'kelas_saat_ini',
     ];
 
     /**

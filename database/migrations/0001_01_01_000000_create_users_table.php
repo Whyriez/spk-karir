@@ -20,9 +20,9 @@ return new class extends Migration
             $table->string('password');
 
             $table->enum('role', ['admin', 'pakar', 'siswa'])->default('siswa');
-
+            $table->enum('kelas_saat_ini', ['10', '11', '12', 'alumni'])->default('10');
+            
             $table->string('nisn')->nullable()->unique();
-            $table->string('asal_sekolah')->default('SMKN 1 Kota Gorontalo');
             $table->rememberToken();
             $table->timestamps();
         });
