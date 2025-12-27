@@ -5,9 +5,11 @@ import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
-import { Head, Link, useForm } from '@inertiajs/react';
+import {Head, Link, useForm, usePage} from '@inertiajs/react';
 
 export default function Login({ status, canResetPassword }) {
+    const {app_settings} = usePage().props;
+
     const { data, setData, post, processing, errors, reset } = useForm({
         login_id: '', // Bisa email atau username/NISN
         password: '',
@@ -30,7 +32,7 @@ export default function Login({ status, canResetPassword }) {
             <Head title="Log in" />
 
             <div className="w-full sm:max-w-md mt-6 px-8 py-10 bg-white shadow-2xl overflow-hidden sm:rounded-xl">
-                
+
                 {/* Header Login */}
                 <div className="text-center mb-8">
                     <h2 className="text-3xl font-extrabold text-gray-900">Selamat Datang</h2>
@@ -89,9 +91,9 @@ export default function Login({ status, canResetPassword }) {
                     </div>
                 </form>
             </div>
-            
+
             <div className="mt-8 text-white text-sm opacity-80">
-                &copy; 2025 SMKN 1 Kota Gorontalo - Sistem Pendukung Keputusan
+                &copy; 2025 {app_settings.school_name} - Sistem Pendukung Keputusan
             </div>
         </div>
     );
