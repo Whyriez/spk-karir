@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Alumni;
 use App\Models\Kriteria;
 use App\Models\NilaiSiswa;
 use App\Models\HasilRekomendasi;
@@ -148,20 +149,17 @@ class MooraController extends Controller
     public function result(Request $request)
     {
         $user = Auth::user();
+        $user->load('jurusan'); // Pastikan relasi jurusan terload
+
         $hasil = null;
 
-        // KASUS 1: Jika Siswa mengklik "Lihat Detail" dari Tabel Riwayat Dashboard
-        // (Misal mau lihat hasil Kelas 10)
+        // --- LOGIC PENGAMBILAN HASIL (Sama seperti sebelumnya) ---
         if ($request->has('id')) {
             $hasil = HasilRekomendasi::with('periode')
                 ->where('siswa_id', $user->id)
                 ->where('id', $request->id)
                 ->first();
-        }
-
-        // KASUS 2: Default (Buka Menu Hasil Rekomendasi)
-        // Tampilkan data dari PERIODE AKTIF (Kelas 12)
-        else {
+        } else {
             $periodeAktif = Periode::where('is_active', true)->first();
 
             if ($periodeAktif) {
@@ -171,17 +169,47 @@ class MooraController extends Controller
                     ->first();
             }
 
-            // Fallback: Jika di periode aktif belum ada data, ambil data paling terakhir yang pernah ada
             if (!$hasil) {
                 $hasil = HasilRekomendasi::with('periode')
                     ->where('siswa_id', $user->id)
-                    ->latest('id') // Ambil berdasarkan ID terbesar (paling baru diinput)
+                    ->latest('id')
                     ->first();
             }
         }
 
+        // --- BARU: LOGIC REKOMENDASI ALUMNI ---
+        $alumniRelevan = [];
+
+        if ($hasil && $user->jurusan) {
+            // 1. Tentukan Keyword Pencarian berdasarkan Keputusan Sistem
+            $keyword = '';
+            switch ($hasil->keputusan_terbaik) {
+                case 'Melanjutkan Studi':
+                    $keyword = 'Kuliah';
+                    break;
+                case 'Bekerja':
+                    $keyword = 'Kerja';
+                    break;
+                case 'Berwirausaha':
+                    $keyword = 'Wirausaha';
+                    break;
+            }
+
+            // 2. Query Alumni
+            // Syarat: Jurusan mirip dengan siswa DAN Status mengandung keyword keputusan
+            if ($keyword) {
+                $alumniRelevan = Alumni::query()
+                    ->where('major', 'LIKE', "%{$user->jurusan->nama}%") // Filter Jurusan (Misal: RPL)
+                    ->where('status', 'LIKE', "%{$keyword}%") // Filter Status (Misal: Kuliah)
+                    ->latest()
+                    ->limit(20) // Batasi maksimal 20 data agar tidak berat
+                    ->get();
+            }
+        }
+
         return Inertia::render('Siswa/Result', [
-            'hasil' => $hasil
+            'hasil' => $hasil,
+            'alumni_relevan' => $alumniRelevan // Kirim data alumni ke frontend
         ]);
     }
 

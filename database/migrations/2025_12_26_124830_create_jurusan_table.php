@@ -15,7 +15,6 @@ return new class extends Migration
             $table->id();
             $table->string('kode_jurusan')->unique();
             $table->string('nama_jurusan');
-            $table->float('nilai_lapangan_kerja')->default(0); 
             $table->timestamps();
         });
     }

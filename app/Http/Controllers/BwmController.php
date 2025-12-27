@@ -57,7 +57,7 @@ class BwmController extends Controller
 
         // Pastikan kriteria Best & Worst TIDAK ikut di-loop jika sudah terpilih
         // (Opsional, tapi biar bersih di form input)
-        // $query->whereNotIn('id', [$bestId, $worstId]); 
+        // $query->whereNotIn('id', [$bestId, $worstId]);
 
         $kriteriaUser = $query->orderBy('kode', 'asc')->get();
 

@@ -4,11 +4,11 @@ import { Head, useForm } from "@inertiajs/react";
 
 // Props berubah sesuai controller baru
 export default function BwmInput({ auth, kriteria_list, global_best, global_worst, user_role }) {
-    
+
     // Form Helper
     const { data, setData, post, processing, errors } = useForm({
-        best_to_others: {}, 
-        others_to_worst: {}, 
+        best_to_others: {},
+        others_to_worst: {},
     });
 
     const submit = (e) => {
@@ -38,7 +38,7 @@ export default function BwmInput({ auth, kriteria_list, global_best, global_wors
 
             <div className="py-12">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                    
+
                     {/* INFO ROLE */}
                     <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
                         <p className="text-sm text-blue-700">
@@ -71,7 +71,7 @@ export default function BwmInput({ auth, kriteria_list, global_best, global_wors
                         </div>
 
                         {/* --- FORM PERBANDINGAN --- */}
-                        
+
                         {/* 1. BEST VS LAINNYA (Milik User) */}
                         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
                             <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">
@@ -80,8 +80,8 @@ export default function BwmInput({ auth, kriteria_list, global_best, global_wors
                             <div className="space-y-3">
                                 {kriteria_list.map((k) => {
                                     // Jangan bandingkan Best vs Best (Nilai pasti 1)
-                                    if (k.id === global_best.id) return null; 
-                                    
+                                    if (k.id === global_best.id) return null;
+
                                     return (
                                         <div key={k.id} className="flex items-center justify-between bg-gray-50 p-3 rounded">
                                             <span className="text-gray-700 font-medium w-1/2">

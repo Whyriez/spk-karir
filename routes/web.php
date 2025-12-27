@@ -53,6 +53,16 @@ Route::middleware('auth', 'verified')->group(function () {
 
         Route::get('/bwm-setting', [App\Http\Controllers\Admin\BwmSettingController::class, 'index'])->name('bwm.setting');
         Route::post('/bwm-setting', [App\Http\Controllers\Admin\BwmSettingController::class, 'store'])->name('bwm.setting.store');
+
+        Route::resource('alumni', App\Http\Controllers\Admin\AlumniController::class)
+            ->names('alumni')
+            ->parameters(['alumni' => 'alumni'])
+            ->except(['create', 'edit', 'show']);
+        Route::post('admin/alumni/bulk-delete', [App\Http\Controllers\Admin\AlumniController::class, 'bulkDestroy'])->name('alumni.bulk_destroy');
+        Route::get('admin/alumni/template', [App\Http\Controllers\Admin\AlumniController::class, 'template'])->name('alumni.template');
+        Route::post('admin/alumni/preview', [App\Http\Controllers\Admin\AlumniController::class, 'preview'])->name('alumni.preview');
+        Route::post('admin/alumni/import', [App\Http\Controllers\Admin\AlumniController::class, 'import'])->name('alumni.import');
+        Route::resource('admin/alumni', App\Http\Controllers\Admin\AlumniController::class)->names('alumni');
     });
 
     Route::middleware('role:pakar')->prefix('pakar')->name('pakar.')->group(function () {

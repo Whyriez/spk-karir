@@ -3,7 +3,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm } from '@inertiajs/react';
 
 export default function InputData({ auth, kriteria_akademik, kriteria_kuesioner, existing_data }) {
-    
+
     // Gabungkan semua kriteria untuk inisialisasi form
     const allKriteria = [...kriteria_akademik, ...kriteria_kuesioner];
 
@@ -14,7 +14,7 @@ export default function InputData({ auth, kriteria_akademik, kriteria_kuesioner,
     });
 
     const { data, setData, post, processing } = useForm({
-        nilai: initialValues 
+        nilai: initialValues
     });
 
     const submit = (e) => {
@@ -36,7 +36,7 @@ export default function InputData({ auth, kriteria_akademik, kriteria_kuesioner,
             if(k.kode === 'C6') return null; // Pengecualian khusus jika C6 hidden
             return (
                 <div className="flex items-center">
-                    <input 
+                    <input
                         type="number" step="0.01" max="100"
                         className="w-full md:w-1/2 border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                         placeholder="Masukkan Angka"
@@ -51,7 +51,7 @@ export default function InputData({ auth, kriteria_akademik, kriteria_kuesioner,
         // 2. Tipe SELECT / DROPDOWN (Cth: Ekonomi)
         if (k.tipe_input === 'select') {
             return (
-                <select 
+                <select
                     className="w-full md:w-1/2 border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                     value={data.nilai[k.id]}
                     onChange={(e) => handleChange(k.id, e.target.value)}
@@ -69,7 +69,7 @@ export default function InputData({ auth, kriteria_akademik, kriteria_kuesioner,
         // 3. Tipe LIKERT (Cth: Minat)
         if (k.tipe_input === 'likert') {
             const likertOptions = [
-                { val: 1, label: 'STS' }, { val: 2, label: 'TS' }, 
+                { val: 1, label: 'STS' }, { val: 2, label: 'TS' },
                 { val: 3, label: 'N' }, { val: 4, label: 'S' }, { val: 5, label: 'SS' }
             ];
             return (
@@ -79,7 +79,7 @@ export default function InputData({ auth, kriteria_akademik, kriteria_kuesioner,
                             flex flex-col items-center justify-center p-3 border rounded-md cursor-pointer transition-all
                             ${data.nilai[k.id] == opt.val ? 'bg-indigo-100 border-indigo-500 text-indigo-700 ring-2' : 'bg-white hover:bg-gray-50'}
                         `}>
-                            <input 
+                            <input
                                 type="radio" name={`k_${k.id}`} value={opt.val}
                                 checked={data.nilai[k.id] == opt.val}
                                 onChange={(e) => handleChange(k.id, e.target.value)}
@@ -100,7 +100,7 @@ export default function InputData({ auth, kriteria_akademik, kriteria_kuesioner,
             <div className="py-12">
                 <div className="max-w-4xl mx-auto sm:px-6 lg:px-8">
                     <form onSubmit={submit} className="space-y-8">
-                        
+
                         {/* LOOP 1: DATA AKADEMIK (Semua yang kategori 'akademik') */}
                         <div className="bg-white p-6 shadow-sm rounded-lg">
                             <h3 className="text-lg font-bold mb-4 border-b pb-2">1. Data Akademik & Ekonomi</h3>

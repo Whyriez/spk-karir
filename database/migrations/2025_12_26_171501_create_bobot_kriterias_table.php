@@ -13,11 +13,11 @@ return new class extends Migration
     {
         Schema::create('bobot_kriterias', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('kriteria_id')->constrained('kriterias')->onDelete('cascade');
+            $table->foreignId('kriteria_id')->constrained('kriteria')->onDelete('cascade');
 
             // NULL = Bobot Global (Punya Guru BK)
             // ISI ANGKA = Bobot Spesifik Jurusan (Punya Kaprodi)
-            $table->foreignId('jurusan_id')->nullable()->constrained('jurusans')->onDelete('cascade');
+            $table->foreignId('jurusan_id')->nullable()->constrained('jurusan')->onDelete('cascade');
 
             $table->double('nilai_bobot'); // Hasil hitungan BWM (0.15, 0.20, dll)
             $table->timestamps();

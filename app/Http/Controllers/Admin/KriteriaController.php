@@ -19,7 +19,7 @@ class KriteriaController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'kode' => 'required|unique:kriterias,kode',
+            'kode' => 'required|unique:kriteria,kode',
             'nama' => 'required|string',
             'tipe_input' => 'required|in:number,select',
             'penanggung_jawab' => 'required|in:gurubk,kaprodi,umum',

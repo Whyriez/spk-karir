@@ -1,14 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link } from '@inertiajs/react';
+import Modal from '@/Components/Modal';
+import SecondaryButton from '@/Components/SecondaryButton';
 
-export default function Result({ auth, hasil }) {
-    
+export default function Result({ auth, hasil, alumni_relevan }) {
+
+    // State untuk Modal Alumni
+    const [isAlumniModalOpen, setIsAlumniModalOpen] = useState(false);
+
     // 1. Handle jika siswa belum mengisi data tapi paksa buka URL ini
     if (!hasil) {
         return (
             <AuthenticatedLayout user={auth.user}>
-                 <div className="py-20 text-center">
+                <div className="py-20 text-center">
                     <div className="inline-block p-4 bg-yellow-100 rounded-full mb-4">
                         <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
                     </div>
@@ -19,7 +24,7 @@ export default function Result({ auth, hasil }) {
                     <Link href={route('siswa.input')} className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-semibold">
                         Mulai Input Data
                     </Link>
-                 </div>
+                </div>
             </AuthenticatedLayout>
         )
     }
@@ -28,7 +33,7 @@ export default function Result({ auth, hasil }) {
     let themeClass = 'border-gray-500 text-gray-700';
     let bgClass = 'bg-gray-50';
     let description = '';
-    
+
     switch (hasil.keputusan_terbaik) {
         case 'Melanjutkan Studi':
             themeClass = 'border-indigo-500 text-indigo-700';
@@ -56,7 +61,7 @@ export default function Result({ auth, hasil }) {
 
             <div className="py-12">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
-                    
+
                     {/* HEADER INFO PERIODE */}
                     <div className="bg-white p-4 rounded-lg shadow-sm border-l-4 border-blue-500 flex justify-between items-center">
                         <div>
@@ -73,10 +78,10 @@ export default function Result({ auth, hasil }) {
 
                     {/* GRID UTAMA */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        
+
                         {/* KOLOM KIRI (2/3): DETAIL HASIL */}
                         <div className="lg:col-span-2 space-y-6">
-                            
+
                             {/* KARTU KEPUTUSAN UTAMA */}
                             <div className={`bg-white overflow-hidden shadow-lg rounded-xl border-t-8 ${themeClass.split(' ')[0]}`}>
                                 <div className="p-8 text-center">
@@ -92,7 +97,46 @@ export default function Result({ auth, hasil }) {
                                 </div>
                             </div>
 
-                            {/* CATATAN GURU BK (PENTING!) */}
+                            {/* --- REKOMENDASI ALUMNI --- */}
+                            {alumni_relevan && alumni_relevan.length > 0 && (
+                                <div className="bg-white overflow-hidden shadow-sm sm:rounded-xl p-6 border border-gray-100">
+                                    <div className="flex flex-col sm:flex-row justify-between items-center mb-4">
+                                        <div>
+                                            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                                                <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                                                Jejak Alumni
+                                            </h3>
+                                            <p className="text-sm text-gray-500">
+                                                Kakak kelas jurusanmu yang sukses di jalur <b>{hasil.keputusan_terbaik}</b>
+                                            </p>
+                                        </div>
+
+                                        {alumni_relevan.length > 3 && (
+                                            <button
+                                                onClick={() => setIsAlumniModalOpen(true)}
+                                                className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 hover:underline mt-2 sm:mt-0"
+                                            >
+                                                Lihat Semua ({alumni_relevan.length})
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                        {/* Tampilkan hanya 3 alumni pertama */}
+                                        {alumni_relevan.slice(0, 3).map((alumni, idx) => (
+                                            <div key={idx} className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                                <div className="font-bold text-gray-800 truncate">{alumni.name}</div>
+                                                <div className="text-xs text-gray-500 mb-1">Angkatan {alumni.batch}</div>
+                                                <div className="text-sm text-indigo-700 font-medium line-clamp-2">
+                                                    {alumni.status}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* CATATAN GURU BK */}
                             <div className="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-200">
                                 <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex items-center gap-2">
                                     <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path></svg>
@@ -176,6 +220,51 @@ export default function Result({ auth, hasil }) {
 
                 </div>
             </div>
+
+            {/* --- MODAL DETAIL ALUMNI --- */}
+            <Modal show={isAlumniModalOpen} onClose={() => setIsAlumniModalOpen(false)}>
+                <div className="p-6">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-lg font-bold text-gray-900">
+                            Daftar Alumni - {hasil.keputusan_terbaik}
+                        </h2>
+                        <button onClick={() => setIsAlumniModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+
+                    <p className="text-sm text-gray-500 mb-4">
+                        Berikut adalah data alumni jurusan Anda yang memilih jalur karir ini:
+                    </p>
+
+                    <div className="overflow-y-auto max-h-[60vh]">
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50 sticky top-0">
+                            <tr>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nama</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Angkatan</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Detail Status</th>
+                            </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                            {alumni_relevan && alumni_relevan.map((alumni, idx) => (
+                                <tr key={idx}>
+                                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{alumni.name}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-500">{alumni.batch}</td>
+                                    <td className="px-4 py-3 text-sm text-indigo-600">{alumni.status}</td>
+                                </tr>
+                            ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className="mt-6 flex justify-end">
+                        <SecondaryButton onClick={() => setIsAlumniModalOpen(false)}>
+                            Tutup
+                        </SecondaryButton>
+                    </div>
+                </div>
+            </Modal>
         </AuthenticatedLayout>
     );
 }
