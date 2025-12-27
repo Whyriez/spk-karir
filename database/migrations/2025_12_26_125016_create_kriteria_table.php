@@ -26,7 +26,6 @@ return new class extends Migration
             // ------------------------------------------------
 
             $table->enum('atribut', ['benefit', 'cost'])->default('benefit');
-            $table->float('bobot_bwm')->nullable();
 
             // Kita ganti 'is_static' menjadi 'kategori' agar lebih jelas pengelompokannya di UI
             $table->enum('kategori', ['akademik', 'kuesioner'])->default('kuesioner');

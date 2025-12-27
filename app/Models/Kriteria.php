@@ -15,7 +15,6 @@ class Kriteria extends Model
         'nama',
         'pertanyaan',
         'atribut',
-        'bobot_bwm',
         'tipe_input',
         'opsi_pilihan',
         'kategori',
