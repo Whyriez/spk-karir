@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\BobotKriteria;
 use App\Models\Kriteria;
-use App\Models\BwmComparison;
 use App\Models\Setting;
 use App\Services\BwmService;
 use Illuminate\Http\Request;
