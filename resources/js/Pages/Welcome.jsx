@@ -1,16 +1,18 @@
-import { Link, Head } from '@inertiajs/react';
+import {Link, Head, usePage} from '@inertiajs/react';
 
 export default function Welcome({ auth }) {
+    const {app_settings} = usePage().props;
+
     return (
         <>
             <Head title="SPK Penentuan Karir SMK" />
-            
+
             <div className="min-h-screen bg-gray-50 text-gray-800 font-sans selection:bg-indigo-500 selection:text-white">
-                
+
                 {/* NAVBAR */}
                 <nav className="flex items-center justify-between px-6 py-4 bg-white shadow-sm sm:px-12">
                     <div className="text-2xl font-bold tracking-tighter text-indigo-600">
-                        SPK<span className="text-gray-900">KARIR</span>
+                        SPK{" "}<span className="text-gray-900"> {app_settings.school_name}</span>
                     </div>
                     <div className="flex items-center gap-4">
                         {auth.user ? (
@@ -34,7 +36,7 @@ export default function Welcome({ auth }) {
                                     className="px-4 py-2 font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition"
                                 >
                                     Register
-                                </Link> 
+                                </Link>
                                 */}
                             </>
                         )}
@@ -48,8 +50,8 @@ export default function Welcome({ auth }) {
                         <span className="text-indigo-600">Secara Ilmiah & Tepat</span>
                     </h1>
                     <p className="max-w-2xl mx-auto text-lg text-gray-600 mb-10">
-                        Sistem Pendukung Keputusan untuk siswa SMKN 1 Gorontalo menggunakan integrasi metode 
-                        <strong> Best Worst Method (BWM)</strong> untuk pembobotan dan 
+                        Sistem Pendukung Keputusan untuk siswa {app_settings.school_name} menggunakan integrasi metode
+                        <strong> Best Worst Method (BWM)</strong> untuk pembobotan dan
                         <strong> MOORA</strong> untuk perankingan rekomendasi.
                     </p>
                     <div className="flex flex-col space-y-4 sm:flex-row sm:justify-center sm:space-y-0 sm:space-x-4">

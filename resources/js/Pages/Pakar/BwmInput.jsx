@@ -1,15 +1,29 @@
-import React, { useEffect } from "react";
+import React, { useMemo } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Head, useForm } from "@inertiajs/react";
 
 // Props berubah sesuai controller baru
-export default function BwmInput({ auth, kriteria_list, global_best, global_worst, user_role }) {
+export default function BwmInput({ auth, kriteria_list, global_best, global_worst, user_role, saved_best_to_others, saved_others_to_worst }) {
 
     // Form Helper
     const { data, setData, post, processing, errors } = useForm({
-        best_to_others: {},
-        others_to_worst: {},
+        best_to_others: saved_best_to_others || {},
+        others_to_worst: saved_others_to_worst || {},
     });
+
+    // --- LOGIKA SORTING (NATURAL SORT) ---
+    // Mengurutkan berdasarkan angka di dalam kode (mengabaikan huruf depan C, K, dll)
+    const sortedKriteriaList = useMemo(() => {
+        // Buat copy array agar tidak memutasi props asli
+        return [...kriteria_list].sort((a, b) => {
+            // Hapus semua karakter yang BUKAN angka, lalu parse ke Int
+            // Contoh: "C1" -> 1, "Kriteria 10" -> 10
+            const numA = parseInt(a.kode.replace(/\D/g, '') || '0');
+            const numB = parseInt(b.kode.replace(/\D/g, '') || '0');
+
+            return numA - numB;
+        });
+    }, [kriteria_list]);
 
     const submit = (e) => {
         e.preventDefault();
@@ -78,7 +92,8 @@ export default function BwmInput({ auth, kriteria_list, global_best, global_wors
                                 Seberapa lebih penting <u>BEST ({global_best.nama})</u> dibanding kriteria Anda?
                             </h3>
                             <div className="space-y-3">
-                                {kriteria_list.map((k) => {
+                                {/* Gunakan sortedKriteriaList menggantikan kriteria_list */}
+                                {sortedKriteriaList.map((k) => {
                                     // Jangan bandingkan Best vs Best (Nilai pasti 1)
                                     if (k.id === global_best.id) return null;
 
@@ -90,6 +105,7 @@ export default function BwmInput({ auth, kriteria_list, global_best, global_wors
                                             <select
                                                 className="w-32 border-gray-300 rounded-md shadow-sm text-sm focus:ring-green-500"
                                                 onChange={(e) => handleComparisonChange("best", k.id, e.target.value)}
+                                                value={data.best_to_others[k.id] || ""}
                                                 required
                                             >
                                                 <option value="">Pilih...</option>
@@ -109,7 +125,8 @@ export default function BwmInput({ auth, kriteria_list, global_best, global_wors
                                 Seberapa lebih penting kriteria Anda dibanding <u>WORST ({global_worst.nama})</u>?
                             </h3>
                             <div className="space-y-3">
-                                {kriteria_list.map((k) => {
+                                {/* Gunakan sortedKriteriaList menggantikan kriteria_list */}
+                                {sortedKriteriaList.map((k) => {
                                     // Jangan bandingkan Worst vs Worst (Nilai pasti 1)
                                     if (k.id === global_worst.id) return null;
 
@@ -121,6 +138,7 @@ export default function BwmInput({ auth, kriteria_list, global_best, global_wors
                                             <select
                                                 className="w-32 border-gray-300 rounded-md shadow-sm text-sm focus:ring-red-500"
                                                 onChange={(e) => handleComparisonChange("others", k.id, e.target.value)}
+                                                value={data.others_to_worst[k.id] || ""}
                                                 required
                                             >
                                                 <option value="">Pilih...</option>

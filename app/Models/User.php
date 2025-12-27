@@ -6,6 +6,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Builder;
 
 class User extends Authenticatable
 {
@@ -55,8 +56,29 @@ class User extends Authenticatable
         ];
     }
 
+    public function scopeRole(Builder $query, $roles): Builder
+    {
+        if (is_array($roles)) {
+            return $query->whereIn('role', $roles);
+        }
+        return $query->where('role', $roles);
+    }
+
+    public function hasRole($roles): bool
+    {
+        if (is_array($roles)) {
+            return in_array($this->role, $roles);
+        }
+        return $this->role === $roles;
+    }
+
     public function jurusan()
     {
         return $this->belongsTo(Jurusan::class, 'jurusan_id');
+    }
+
+    public function hasilRekomendasi()
+    {
+        return $this->hasMany(HasilRekomendasi::class, 'siswa_id');
     }
 }

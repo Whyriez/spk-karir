@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\BobotKriteria;
 use App\Models\Kriteria;
+use App\Models\BwmComparison;
 use App\Models\Setting;
 use App\Services\BwmService;
 use Illuminate\Http\Request;
@@ -27,44 +28,54 @@ class BwmController extends Controller
     {
         $user = Auth::user();
 
-        // 1. Ambil Settingan FGD (ID Terkunci)
+        // 1. Ambil Settingan FGD
         $bestId = Setting::where('key', 'bwm_best_id')->value('value');
         $worstId = Setting::where('key', 'bwm_worst_id')->value('value');
 
-        // Cek jika Admin belum setting
         if (!$bestId || !$worstId) {
             return Inertia::render('Pakar/BwmError', [
                 'msg' => 'Admin belum menginput hasil FGD. Hubungi Admin.'
             ]);
         }
 
-        // 2. Ambil Object Best & Worst Global (Penting! Agar namanya muncul di UI)
         $globalBest = Kriteria::find($bestId);
         $globalWorst = Kriteria::find($worstId);
 
-        // 3. FILTER KRITERIA BERDASARKAN USER (Ini solusi masalahmu)
+        // 2. Filter Kriteria
         $query = Kriteria::query();
-
         if ($user->jenis_pakar === 'gurubk') {
-            // Guru BK hanya menilai aspek BK + Umum
             $query->whereIn('penanggung_jawab', ['gurubk', 'umum']);
         } elseif ($user->jenis_pakar === 'kaprodi') {
-            // Kaprodi hanya menilai aspek Prodi + Umum
             $query->whereIn('penanggung_jawab', ['kaprodi', 'umum']);
         }
-        // Jika Admin/Testing, biarkan melihat semua
-
-        // Pastikan kriteria Best & Worst TIDAK ikut di-loop jika sudah terpilih
-        // (Opsional, tapi biar bersih di form input)
-        // $query->whereNotIn('id', [$bestId, $worstId]);
-
         $kriteriaUser = $query->orderBy('kode', 'asc')->get();
 
+        // --- BARU: AMBIL DATA LAMA DARI DATABASE ---
+        $savedComparisons = BwmComparison::where('pakar_id', $user->id)
+            ->where('best_criterion_id', $bestId) // Pastikan referensinya sama
+            ->get();
+
+        // Format data agar sesuai dengan state React (Object key-value)
+        $savedBestToOthers = [];
+        $savedOthersToWorst = [];
+
+        foreach ($savedComparisons as $item) {
+            if ($item->comparison_type === 'best_to_others') {
+                $savedBestToOthers[$item->compared_criterion_id] = $item->value;
+            } else {
+                $savedOthersToWorst[$item->compared_criterion_id] = $item->value;
+            }
+        }
+        // -------------------------------------------
+
         return Inertia::render('Pakar/BwmInput', [
-            'kriteria_list' => $kriteriaUser, // <--- HANYA YANG WAJIB DINILAI
-            'global_best' => $globalBest,     // <--- DATA BEST (Untuk Info Box)
-            'global_worst' => $globalWorst,   // <--- DATA WORST (Untuk Info Box)
-            'user_role' => $user->jenis_pakar
+            'kriteria_list' => $kriteriaUser,
+            'global_best' => $globalBest,
+            'global_worst' => $globalWorst,
+            'user_role' => $user->jenis_pakar,
+            // Kirim data lama ke frontend
+            'saved_best_to_others' => $savedBestToOthers,
+            'saved_others_to_worst' => $savedOthersToWorst
         ]);
     }
 
@@ -89,13 +100,34 @@ class BwmController extends Controller
         $bestToOthers = $request->best_to_others; // Array [id_kriteria => nilai 1-9]
         $othersToWorst = $request->others_to_worst; // Array [id_kriteria => nilai 1-9]
 
-        // ---------------------------------------------------------
-        // RUMUS MATEMATIKA BWM (Versi Coding PHP)
-        // ---------------------------------------------------------
+        // 1. Simpan Best to Others
+        foreach ($bestToOthers as $kriteriaId => $val) {
+            BwmComparison::updateOrCreate(
+                [
+                    'pakar_id' => $user->id,
+                    'best_criterion_id' => $bestId,
+                    'worst_criterion_id' => $worstId,
+                    'comparison_type' => 'best_to_others',
+                    'compared_criterion_id' => $kriteriaId
+                ],
+                ['value' => $val]
+            );
+        }
 
-        // A. Cari Nilai Perbandingan "Best vs Worst" (a_BW)
-        // Nilai ini sangat penting sebagai jangkar referensi
-        // Kita cari di input 'best_to_others' milik ID Worst
+        // 2. Simpan Others to Worst
+        foreach ($othersToWorst as $kriteriaId => $val) {
+            BwmComparison::updateOrCreate(
+                [
+                    'pakar_id' => $user->id,
+                    'best_criterion_id' => $bestId,
+                    'worst_criterion_id' => $worstId,
+                    'comparison_type' => 'others_to_worst',
+                    'compared_criterion_id' => $kriteriaId
+                ],
+                ['value' => $val]
+            );
+        }
+
         $val_BestToWorst = isset($bestToOthers[$worstId]) ? (int)$bestToOthers[$worstId] : 1;
 
         // B. Ambil Semua Kriteria yang Menjadi Tanggung Jawab User Ini
@@ -169,6 +201,6 @@ class BwmController extends Controller
             );
         }
 
-        return back()->with('success', 'Perhitungan BWM selesai! Bobot berhasil disimpan untuk ' . ($scopeJurusan ? 'Jurusan Anda' : 'Global (Umum)'));
+        return back()->with('success', 'Perhitungan BWM selesai dan data tersimpan!');
     }
 }

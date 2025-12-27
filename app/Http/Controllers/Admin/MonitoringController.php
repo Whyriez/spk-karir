@@ -12,33 +12,63 @@ class MonitoringController extends Controller
 {
     public function index(Request $request)
     {
-        // 1. Ambil Parameter Pencarian (Search)
+        // 1. Ambil Parameter Pencarian & Filter
         $search = $request->input('search');
         $periodeId = $request->input('periode_id');
+        $status = $request->input('status', 'sudah'); // Default 'sudah'
 
-        // 2. Query Data Hasil Rekomendasi
-        $query = HasilRekomendasi::with(['user', 'periode'])
-            ->orderBy('created_at', 'desc');
-
-        // Filter by Search (Nama Siswa)
-        if ($search) {
-            $query->whereHas('user', function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%");
-            });
-        }
-
-        // Filter by Periode (Jika ada, jika tidak default semua atau aktif)
-        if ($periodeId) {
-            $query->where('periode_id', $periodeId);
-        }
-
-        // 3. Ambil Data Periode untuk Dropdown Filter
+        // Ambil Data Periode untuk Dropdown
         $periodes = Periode::orderBy('created_at', 'desc')->get();
 
+        // JIKA FILTER: SUDAH MENGISI (Logic Lama)
+        if ($status === 'sudah') {
+            $query = HasilRekomendasi::with(['user', 'periode'])
+                ->orderBy('created_at', 'desc');
+
+            if ($search) {
+                $query->whereHas('user', function($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('nisn', 'like', "%{$search}%");
+                });
+            }
+
+            if ($periodeId) {
+                $query->where('periode_id', $periodeId);
+            }
+
+            $results = $query->paginate(10)->withQueryString();
+        }
+
+        // JIKA FILTER: BELUM MENGISI (Logic Baru)
+        else {
+            // Ambil Siswa
+            $query = \App\Models\User::with('jurusan')->where('role', 'siswa');
+
+            // Filter Search
+            if ($search) {
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('nisn', 'like', "%{$search}%");
+                });
+            }
+
+            // Filter Logic "Belum Mengisi"
+            // Cari siswa yang TIDAK PUNYA data hasil_rekomendasi di periode terpilih
+            $query->whereDoesntHave('hasilRekomendasi', function($q) use ($periodeId) {
+                if ($periodeId) {
+                    $q->where('periode_id', $periodeId);
+                }
+            });
+
+            $results = $query->paginate(10)->withQueryString();
+        }
+
         return Inertia::render('Admin/Monitoring/Index', [
-            'results' => $query->paginate(10)->withQueryString(), // Pagination biar ringan
+            'results' => $results,
             'periodes' => $periodes,
-            'filters' => $request->only(['search', 'periode_id'])
+            'filters' => array_merge($request->only(['search', 'periode_id', 'status']), [
+                'status' => $status // Pastikan status terkirim balik
+            ])
         ]);
     }
 
@@ -49,7 +79,7 @@ class MonitoringController extends Controller
         ]);
 
         $hasil = HasilRekomendasi::findOrFail($id);
-        
+
         $hasil->update([
             'catatan_guru_bk' => $request->catatan_guru_bk
         ]);
