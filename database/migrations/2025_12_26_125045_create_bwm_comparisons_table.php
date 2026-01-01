@@ -15,19 +15,19 @@ return new class extends Migration
             $table->id();
             // Siapa pakar yang menilai
             $table->foreignId('pakar_id')->constrained('users')->onDelete('cascade');
-            
+
             // Referensi Kriteria Terbaik & Terburuk yang dipilih pakar
             $table->foreignId('best_criterion_id')->constrained('kriteria');
             $table->foreignId('worst_criterion_id')->constrained('kriteria');
-            
+
             // Jenis perbandingan: Best-to-Others atau Others-to-Worst
             $table->enum('comparison_type', ['best_to_others', 'others_to_worst']);
-            
+
             // Kriteria yang sedang dibandingkan dengan Best/Worst
-            $table->foreignId('compared_criterion_id')->constrained('kriteria');
-            
+            $table->foreignId('compared_criterion_id')->constrained('kriteria')->onDelete('cascade');
+
             $table->integer('value');
-            
+
             $table->timestamps();
         });
     }

@@ -103,13 +103,7 @@ class BwmController extends Controller
         // 1. Simpan Best to Others
         foreach ($bestToOthers as $kriteriaId => $val) {
             BwmComparison::updateOrCreate(
-                [
-                    'pakar_id' => $user->id,
-                    'best_criterion_id' => $bestId,
-                    'worst_criterion_id' => $worstId,
-                    'comparison_type' => 'best_to_others',
-                    'compared_criterion_id' => $kriteriaId
-                ],
+                ['pakar_id' => $user->id, 'best_criterion_id' => $bestId, 'worst_criterion_id' => $worstId, 'comparison_type' => 'best_to_others', 'compared_criterion_id' => $kriteriaId],
                 ['value' => $val]
             );
         }
@@ -117,17 +111,10 @@ class BwmController extends Controller
         // 2. Simpan Others to Worst
         foreach ($othersToWorst as $kriteriaId => $val) {
             BwmComparison::updateOrCreate(
-                [
-                    'pakar_id' => $user->id,
-                    'best_criterion_id' => $bestId,
-                    'worst_criterion_id' => $worstId,
-                    'comparison_type' => 'others_to_worst',
-                    'compared_criterion_id' => $kriteriaId
-                ],
+                ['pakar_id' => $user->id, 'best_criterion_id' => $bestId, 'worst_criterion_id' => $worstId, 'comparison_type' => 'others_to_worst', 'compared_criterion_id' => $kriteriaId],
                 ['value' => $val]
             );
         }
-
         $val_BestToWorst = isset($bestToOthers[$worstId]) ? (int)$bestToOthers[$worstId] : 1;
 
         // B. Ambil Semua Kriteria yang Menjadi Tanggung Jawab User Ini
@@ -145,29 +132,15 @@ class BwmController extends Controller
         // C. Hitung Raw Weight (Bobot Mentah) untuk setiap Kriteria
         foreach ($kriterias as $k) {
             $id = $k->id;
-
             if ($id === $bestId) {
-                // 1. Jika ini Kriteria BEST, bobot mentahnya pasti 1.0 (Referensi)
                 $rawWeights[$id] = 1.0;
             } elseif ($id === $worstId) {
-                // 2. Jika ini Kriteria WORST, bobotnya adalah 1 dibagi (Best vs Worst)
-                // Contoh: Jika Best 9x lebih penting dari Worst, maka Worst = 1/9
                 $rawWeights[$id] = 1.0 / $val_BestToWorst;
             } else {
-                // 3. Jika Kriteria LAIN (Di tengah-tengah)
-                // Kita hitung dari dua arah untuk akurasi (Rata-rata)
-
-                // Jalur 1: Dari Best (1 / a_Bj)
-                // Nilai Best vs This
                 $val_BestVsThis = isset($bestToOthers[$id]) ? (int)$bestToOthers[$id] : 1;
                 $w1 = 1.0 / $val_BestVsThis;
-
-                // Jalur 2: Dari Worst (a_jW / a_BW)
-                // Nilai This vs Worst
                 $val_ThisVsWorst = isset($othersToWorst[$id]) ? (int)$othersToWorst[$id] : 1;
                 $w2 = $val_ThisVsWorst / $val_BestToWorst;
-
-                // Ambil Rata-rata dari kedua jalur
                 $rawWeights[$id] = ($w1 + $w2) / 2;
             }
         }
@@ -176,9 +149,7 @@ class BwmController extends Controller
         // Rumus: Bobot Akhir = Bobot Mentah / Total Bobot Mentah
         $totalRawScore = array_sum($rawWeights);
         $finalWeights = [];
-
         foreach ($rawWeights as $id => $val) {
-            // Cegah pembagian nol
             $finalWeights[$id] = $totalRawScore > 0 ? ($val / $totalRawScore) : 0;
         }
 
@@ -189,16 +160,41 @@ class BwmController extends Controller
         // Tentukan scope jurusan (Apakah Global atau Spesifik Jurusan)
         $scopeJurusan = ($user->jenis_pakar === 'kaprodi') ? $user->jurusan_id : null;
 
+        $kriteriaMap = $kriterias->keyBy('id');
+
         foreach ($finalWeights as $kriteriaId => $nilaiBobot) {
+            // 1. Simpan Bobot Baru
             BobotKriteria::updateOrCreate(
                 [
                     'kriteria_id' => $kriteriaId,
-                    'jurusan_id' => $scopeJurusan // Kunci pembeda (Global vs Jurusan)
+                    'jurusan_id' => $scopeJurusan
                 ],
                 [
                     'nilai_bobot' => $nilaiBobot
                 ]
             );
+
+            // 2. LOGIC FIX: Hapus Data Sampah/Lama yang beda Jurusan ID
+            // Cek siapa penanggung jawab kriteria ini sebenarnya
+            $kriteriaItem = $kriteriaMap[$kriteriaId] ?? null;
+
+            if ($kriteriaItem) {
+                // KASUS A: Kriteria Milik KAPRODI, tapi ada sisa bobot Global (NULL)
+                // Jika user saat ini Kaprodi, hapus sisa bobot Global yang mungkin nyangkut
+                if ($kriteriaItem->penanggung_jawab === 'kaprodi' && $scopeJurusan) {
+                    BobotKriteria::where('kriteria_id', $kriteriaId)
+                        ->whereNull('jurusan_id') // Hapus yang global
+                        ->delete();
+                }
+
+                // KASUS B: Kriteria Milik GURUBK, tapi ada sisa bobot Jurusan
+                // Jika user saat ini GuruBK, hapus sisa bobot Jurusan yang mungkin nyangkut
+                if ($kriteriaItem->penanggung_jawab === 'gurubk' && is_null($scopeJurusan)) {
+                    BobotKriteria::where('kriteria_id', $kriteriaId)
+                        ->whereNotNull('jurusan_id') // Hapus yang spesifik jurusan
+                        ->delete();
+                }
+            }
         }
 
         return back()->with('success', 'Perhitungan BWM selesai dan data tersimpan!');

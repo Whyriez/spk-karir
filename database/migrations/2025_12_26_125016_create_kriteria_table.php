@@ -29,6 +29,7 @@ return new class extends Migration
 
             // Kita ganti 'is_static' menjadi 'kategori' agar lebih jelas pengelompokannya di UI
             $table->enum('kategori', ['akademik', 'kuesioner'])->default('kuesioner');
+            $table->enum('sumber_nilai', ['input_siswa', 'static_jurusan'])->default('input_siswa');
 
             $table->timestamps();
         });

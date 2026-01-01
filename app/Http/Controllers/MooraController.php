@@ -7,6 +7,7 @@ use App\Models\Kriteria;
 use App\Models\NilaiSiswa;
 use App\Models\HasilRekomendasi;
 use App\Models\Jurusan;
+use App\Models\NilaiStaticJurusan;
 use App\Models\Periode;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -19,10 +20,19 @@ class MooraController extends Controller
      */
     public function index()
     {
+        // Ambil semua kriteria yang aktif (tampil_di_siswa = true)
+        // Urutkan berdasarkan kode agar rapi
+        $kriterias = Kriteria::where('tampil_di_siswa', true)
+            ->orderBy('kode', 'asc')
+            ->get();
+
+        // Ambil data nilai siswa yang sudah ada (jika mau edit)
+        $existingValues = NilaiSiswa::where('siswa_id', auth()->id())
+            ->pluck('nilai_input', 'kriteria_id');
+
         return Inertia::render('Siswa/InputData', [
-            'kriteria_akademik' => Kriteria::where('kategori', 'akademik')->get(),
-            'kriteria_kuesioner' => Kriteria::where('kategori', 'kuesioner')->get(),
-            'existing_data' => NilaiSiswa::where('siswa_id', Auth::id())->get()->keyBy('kriteria_id')
+            'kriterias' => $kriterias,
+            'existing_data' => $existingValues // Kirim data lama jika ada
         ]);
     }
 
@@ -89,55 +99,64 @@ class MooraController extends Controller
     public function store(Request $request)
     {
         $user = Auth::user();
-
-
         $tingkatKelas = $user->kelas_saat_ini;
 
         // 1. Cek Periode Aktif
         $periodeAktif = Periode::where('is_active', true)->first();
-        if (!$periodeAktif) return back()->withErrors(['msg' => 'Tidak ada periode aktif.']);
 
         if (!$periodeAktif) {
             return back()->withErrors(['msg' => 'Tidak ada periode penilaian yang sedang aktif. Hubungi Guru BK.']);
         }
 
-        $input = $request->input('nilai');
-        foreach ($input as $kriteriaId => $nilai) {
-            if ($nilai === null || $nilai === '') continue;
+        // 2. PROSES PENYIMPANAN DATA (DINAMIS)
+        // Kita ambil SEMUA kriteria untuk dicek satu per satu sumber nilainya
+        $allKriteria = Kriteria::all();
 
-            NilaiSiswa::updateOrCreate(
-                [
-                    'siswa_id' => $user->id,
-                    'kriteria_id' => $kriteriaId,
-                    'periode_id' => $periodeAktif->id // <-- KUNCI AGAR TIDAK MENIMPA DATA LAMA
-                ],
-                [
-                    'nilai_input' => $nilai,
-                    'tingkat_kelas' => $tingkatKelas
-                ]
-            );
+        foreach ($allKriteria as $k) {
+            $nilaiFinal = null;
+
+            // --- CEK SUMBER NILAI ---
+
+            if ($k->sumber_nilai === 'input_siswa') {
+                // KASUS A: Nilai berasal dari Inputan Siswa (Form)
+                // Cek apakah ada kiriman data untuk ID kriteria ini di request
+                $inputSiswa = $request->input('nilai');
+
+                if (isset($inputSiswa[$k->id]) && $inputSiswa[$k->id] !== null) {
+                    $nilaiFinal = $inputSiswa[$k->id];
+                } else {
+                    continue; // Skip jika siswa tidak mengisi (biar tidak error/null)
+                }
+
+            } elseif ($k->sumber_nilai === 'static_jurusan') {
+                // KASUS B: Nilai berasal dari Tabel Statis (Cth: C6 Lapangan Kerja)
+                // Query ke tabel nilai_static_jurusan berdasarkan Jurusan User
+                $dataStatic = NilaiStaticJurusan::where('jurusan_id', $user->jurusan_id)
+                    ->where('kriteria_id', $k->id)
+                    ->first();
+
+                // Jika admin sudah set nilainya, ambil. Jika belum, set 0.
+                $nilaiFinal = $dataStatic ? $dataStatic->nilai : 0;
+            }
+
+            // --- SIMPAN KE DATABASE ---
+            if ($nilaiFinal !== null) {
+                NilaiSiswa::updateOrCreate(
+                    [
+                        'siswa_id' => $user->id,
+                        'kriteria_id' => $k->id,
+                        'periode_id' => $periodeAktif->id // Kunci agar tidak menimpa data periode lalu
+                    ],
+                    [
+                        'nilai_input' => $nilaiFinal,
+                        'tingkat_kelas' => $tingkatKelas
+                    ]
+                );
+            }
         }
 
-        // 3. Simpan Nilai C6 (Lapangan Kerja) Otomatis
-        // Code lama tetap dipakai, tambah periode_id saja
-        $jurusan = Jurusan::find($user->jurusan_id);
-        $kriteriaC6 = Kriteria::where('kode', 'C6')->first();
-
-        if ($jurusan && $kriteriaC6) {
-            NilaiSiswa::updateOrCreate(
-                [
-                    'siswa_id' => $user->id,
-                    'kriteria_id' => $kriteriaC6->id,
-                    'periode_id' => $periodeAktif->id
-                ],
-                [
-                    'nilai_input' => $jurusan->nilai_lapangan_kerja,
-                    'tingkat_kelas' => $tingkatKelas
-                ]
-            );
-        }
-
-        // 4. Hitung Ranking (Pass Periode Aktif ke fungsi kalkulasi)
+        // 3. Hitung Ranking (Bagian ini tetap sama)
+        // Bagian manual C6 yang lama SUDAH DIHAPUS karena sudah tercover otomatis di loop atas (Kasus B)
         $this->calculateRanking($periodeAktif, $tingkatKelas);
 
         return to_route('siswa.result');
@@ -262,11 +281,28 @@ class MooraController extends Controller
         // D. Hitung Pembagi Normalisasi (MOORA)
         $divisors = [];
         // Kita loop berdasarkan key bobot yang ada saja (efisiensi)
-        foreach (array_keys($finalWeights) as $kId) {
-            $sumSquares = $allNilai->where('kriteria_id', $kId)
-                ->sum(fn($row) => pow($row->nilai_input, 2));
+//        foreach (array_keys($finalWeights) as $kId) {
+//            $sumSquares = $allNilai->where('kriteria_id', $kId)
+//                ->sum(fn($row) => pow($row->nilai_input, 2));
+//
+//            $divisors[$kId] = sqrt($sumSquares);
+//        }
 
-            $divisors[$kId] = sqrt($sumSquares);
+        foreach ($finalWeights as $kId => $bobot) {
+            $kriteria = Kriteria::find($kId);
+
+            // Tentukan pembagi statis berdasarkan tipe input
+            if ($kriteria->tipe_input == 'number') {
+                // Asumsi nilai rapor max 100
+                $divisors[$kId] = 100;
+            } elseif ($kriteria->tipe_input == 'select' || $kriteria->tipe_input == 'likert') {
+                // Asumsi skala likert max 5
+                $divisors[$kId] = 5;
+            } else {
+                // Fallback ke rumus asli jika ragu
+                $sumSquares = $allNilai->where('kriteria_id', $kId)->sum(fn($row) => pow($row->nilai_input, 2));
+                $divisors[$kId] = sqrt($sumSquares);
+            }
         }
 
         // E. Ambil Nilai User yang Login

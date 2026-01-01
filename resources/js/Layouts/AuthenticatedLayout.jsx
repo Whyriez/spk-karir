@@ -44,9 +44,14 @@ export default function Authenticated({user, header, children}) {
                         ],
                     },
                     {
-                        label: "Metode SPK",
+                        label: "Data Master",
                         type: "dropdown",
                         items: [
+                            {
+                                label: "Data Jurusan",
+                                route: "admin.jurusan.index",
+                                active: "admin.jurusan.*",
+                            },
                             {
                                 label: "Manajemen Kriteria",
                                 route: "admin.kriteria.index",
@@ -83,6 +88,12 @@ export default function Authenticated({user, header, children}) {
                         label: "Dashboard",
                         route: "dashboard",
                         active: "dashboard",
+                        type: "link",
+                    },
+                    {
+                        label: "Manajemen Pertanyaan",
+                        route: "pakar.kriteria.index",
+                        active: "pakar.kriteria.*",
                         type: "link",
                     },
                     {

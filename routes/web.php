@@ -49,6 +49,8 @@ Route::middleware('auth', 'verified')->group(function () {
         Route::get('/monitoring', [App\Http\Controllers\Admin\MonitoringController::class, 'index'])->name('monitoring.index');
         Route::post('/monitoring/{id}/catatan', [App\Http\Controllers\Admin\MonitoringController::class, 'updateCatatan'])->name('monitoring.update');
 
+        Route::resource('jurusan', \App\Http\Controllers\Admin\JurusanController::class);
+
         Route::resource('kriteria', App\Http\Controllers\Admin\KriteriaController::class);
 
         Route::get('/bwm-setting', [App\Http\Controllers\Admin\BwmSettingController::class, 'index'])->name('bwm.setting');
@@ -68,6 +70,9 @@ Route::middleware('auth', 'verified')->group(function () {
     Route::middleware('role:pakar')->prefix('pakar')->name('pakar.')->group(function () {
         Route::get('/bwm', [BwmController::class, 'index'])->name('bwm');
         Route::post('/bwm', [BwmController::class, 'store'])->name('bwm.store');
+
+        Route::get('/kriteria', [\App\Http\Controllers\Pakar\KriteriaPakarController::class, 'index'])->name('kriteria.index');
+        Route::patch('/kriteria/{id}', [\App\Http\Controllers\Pakar\KriteriaPakarController::class, 'update'])->name('kriteria.update');
     });
 
     Route::middleware('role:siswa')->prefix('siswa')->name('siswa.')->group(function () {

@@ -23,6 +23,7 @@ class KriteriaController extends Controller
             'nama' => 'required|string',
             'tipe_input' => 'required|in:number,select',
             'penanggung_jawab' => 'required|in:gurubk,kaprodi,umum',
+            'tampil_di_siswa' => 'boolean',
         ]);
 
         Kriteria::create($request->all());
@@ -45,6 +46,7 @@ class KriteriaController extends Controller
             'nama' => $request->nama,
             'tipe_input' => $request->tipe_input,
             'penanggung_jawab' => $request->penanggung_jawab,
+            'tampil_di_siswa' => $request->boolean('tampil_di_siswa'),
         ]);
 
         return back()->with('success', 'Kriteria berhasil diperbarui.');
