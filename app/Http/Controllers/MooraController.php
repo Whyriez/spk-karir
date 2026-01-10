@@ -280,7 +280,7 @@ class MooraController extends Controller
 
         // D. Hitung Pembagi Normalisasi (MOORA)
         $divisors = [];
-        // Kita loop berdasarkan key bobot yang ada saja (efisiensi)
+        // Rumus 3.1: Akar Kuadrat dari Jumlah Kuadrat (Sqrt of Sum Squares)
 //        foreach (array_keys($finalWeights) as $kId) {
 //            $sumSquares = $allNilai->where('kriteria_id', $kId)
 //                ->sum(fn($row) => pow($row->nilai_input, 2));
@@ -288,6 +288,7 @@ class MooraController extends Controller
 //            $divisors[$kId] = sqrt($sumSquares);
 //        }
 
+        //Rumus Max Normalization
         foreach ($finalWeights as $kId => $bobot) {
             $kriteria = Kriteria::find($kId);
 
@@ -338,9 +339,17 @@ class MooraController extends Controller
 
             // Logika Pengelompokan Alternatif (Sesuai Proposal)
             // Pastikan kode C1, C2 dst sesuai database Anda
-            if (in_array($kode, ['C1', 'C2', 'C4', 'C5'])) $yStudi += $normalizedValue;
-            if (in_array($kode, ['C3', 'C6', 'C5'])) $yKerja += $normalizedValue;
-            if (in_array($kode, ['C7', 'C8', 'C4', 'C5'])) $yWirausaha += $normalizedValue;
+            // Alternatif: MELANJUTKAN STUDI
+            // Proposal: Akademik(C1), Minat Studi(C2), Ekonomi(C4), Motivasi(C5), Lapangan Kerja(C6)
+            if (in_array($kode, ['C1', 'C2', 'C4', 'C5', 'C6'])) $yStudi += $normalizedValue;
+
+            // Alternatif: BEKERJA
+            // Proposal: Akademik(C1), Minat Kerja(C3), Motivasi(C5), Lapangan Kerja(C6)
+            if (in_array($kode, ['C1', 'C3', 'C5', 'C6'])) $yKerja += $normalizedValue;
+
+            // Alternatif: WIRAUSAHA
+            // Proposal: Akademik(C1), Ekonomi(C4), Motivasi(C5), Minat Usaha(C7), Modal(C8)
+            if (in_array($kode, ['C1', 'C4', 'C5', 'C7', 'C8'])) $yWirausaha += $normalizedValue;
         }
 
         // G. Tentukan Keputusan Terbaik

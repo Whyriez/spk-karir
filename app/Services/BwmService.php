@@ -32,61 +32,151 @@ class BwmService
      */
     public function calculate(string $bestCriterionCode, string $worstCriterionCode, array $bestToOthers, array $othersToWorst)
     {
-        // 1. Hitung Bobot Sementara berdasarkan vektor Best-to-Others
-        // Rumus: w_j = w_best / a_Bj
-        // Kita cari w_best dulu: w_best = 1 / Sigma(1/a_Bj)
-        
+        // 1. Inisialisasi Bobot Awal (Menggunakan Metode Reciprocal Sederhana sebagai Start Point)
+        // Ini membantu solver menemukan solusi lebih cepat
+        $initialWeights = [];
         $sumReciprocal = 0;
-        foreach ($bestToOthers as $code => $value) {
-            // Validasi deviasi nol
-            if ($value == 0) $value = 1; 
-            $sumReciprocal += (1 / $value);
+        foreach ($bestToOthers as $code => $val) {
+            $val = ($val == 0) ? 1 : $val;
+            $sumReciprocal += (1 / $val);
+        }
+        $wBestInitial = 1 / $sumReciprocal;
+
+        foreach ($bestToOthers as $code => $val) {
+            $initialWeights[$code] = $wBestInitial / (($val == 0) ? 1 : $val);
         }
 
-        // Bobot kriteria terbaik
-        $weightBest = 1 / $sumReciprocal;
+        // 2. Jalankan Solver Optimasi untuk Meminimalkan Xi (Sesuai Rumus 2.3)
+        // Kita mencari set bobot yang meminimalkan error maksimum
+        $optimizationResult = $this->optimizeWeights(
+            $initialWeights,
+            $bestCriterionCode,
+            $worstCriterionCode,
+            $bestToOthers,
+            $othersToWorst
+        );
 
-        // Hitung bobot kriteria lainnya
-        $weights = [];
-        foreach ($bestToOthers as $code => $value) {
-            $weights[$code] = $weightBest / $value;
-        }
-
-        // 2. Hitung Nilai Konsistensi (Ksi / Xi)
-        // Kita cek deviasi maksimal dari input user vs hasil hitungan
-        $maxDiff = 0;
-
-        // Cek Deviasi 1: Best-to-Others (Harusnya kecil/nol karena ini basis hitungan)
-        foreach ($bestToOthers as $j => $aBj) {
-            // |wB / wj - aBj|
-            $diff = abs(($weights[$bestCriterionCode] / $weights[$j]) - $aBj);
-            if ($diff > $maxDiff) $maxDiff = $diff;
-        }
-
-        // Cek Deviasi 2: Others-to-Worst (Ini validasi sesungguhnya)
-        // Rumus: |wj / wW - ajW|
-        $weightWorst = $weights[$worstCriterionCode];
-        foreach ($othersToWorst as $j => $ajW) {
-            // |wj / wW - ajW|
-            $diff = abs(($weights[$j] / $weightWorst) - $ajW);
-            if ($diff > $maxDiff) $maxDiff = $diff;
-        }
+        $finalWeights = $optimizationResult['weights'];
+        $xi = $optimizationResult['xi']; // Nilai Xi min-max optimal
 
         // 3. Hitung Consistency Ratio (CR)
-        // Ambil nilai perbandingan terbesar yang dilakukan pakar (max scale) untuk cari CI
-        // Biasanya diambil dari aBW (Best to Worst)
-        $aBW = $bestToOthers[$worstCriterionCode]; // Nilai Best terhadap Worst
+        // Ambil skala perbandingan terbesar (biasanya aBW) untuk menentukan CI
+        $aBW = $bestToOthers[$worstCriterionCode] ?? 9;
         $ci = $this->getConsistencyIndex($aBW);
 
-        $cr = ($ci == 0) ? 0 : ($maxDiff / $ci);
+        $cr = ($ci == 0) ? 0 : ($xi / $ci);
 
         return [
-            'weights' => $weights,
+            'weights' => $finalWeights,
             'consistency_ratio' => round($cr, 4),
-            'is_consistent' => $cr <= 0.10, // Sesuai syarat CR <= 0.1 
-            'xi' => $maxDiff,
+            'is_consistent' => $cr <= 0.10,
+            'xi' => $xi,
             'ci_used' => $ci
         ];
+    }
+
+    /**
+     * Solver Numerik untuk Model BWM (Iterative Hill Climbing / Random Mutation).
+     * Tujuan: Menemukan bobot yang meminimalkan deviasi maksimum (Xi).
+     * Sesuai batasan: |wB - aBj*wj| <= xi*wj dan |wj - ajW*wW| <= xi*wW
+     */
+    private function optimizeWeights($currentWeights, $bestCode, $worstCode, $bestToOthers, $othersToWorst)
+    {
+        $bestError = $this->calculateMaxError($currentWeights, $bestCode, $worstCode, $bestToOthers, $othersToWorst);
+        $bestWeights = $currentWeights;
+
+        // Parameter Optimasi
+        $iterations = 5000; // Jumlah iterasi (semakin banyak semakin akurat)
+        $learningRate = 0.1; // Seberapa besar perubahan bobot per iterasi
+        $codes = array_keys($currentWeights);
+
+        // Algoritma: Random Mutation Hill Climbing
+        // Sederhana namun sangat efektif untuk masalah konveks seperti BWM
+        for ($i = 0; $i < $iterations; $i++) {
+            // 1. Buat kandidat bobot baru dengan mutasi kecil
+            $candidateWeights = $bestWeights;
+
+            // Pilih satu kriteria acak untuk diubah
+            $randomKey = $codes[array_rand($codes)];
+            $mutation = (mt_rand(-1000, 1000) / 1000) * $learningRate; // Random float antara -LR sampai +LR
+
+            $candidateWeights[$randomKey] += $mutation;
+
+            // Pastikan tidak negatif
+            if ($candidateWeights[$randomKey] < 0.0001) {
+                $candidateWeights[$randomKey] = 0.0001;
+            }
+
+            // 2. Normalisasi agar total bobot tetap 1
+            $total = array_sum($candidateWeights);
+            foreach ($candidateWeights as $k => $v) {
+                $candidateWeights[$k] = $v / $total;
+            }
+
+            // 3. Hitung Error (Xi) untuk kandidat ini
+            $candidateError = $this->calculateMaxError($candidateWeights, $bestCode, $worstCode, $bestToOthers, $othersToWorst);
+
+            // 4. Jika error lebih kecil, simpan sebagai solusi terbaik baru
+            if ($candidateError < $bestError) {
+                $bestWeights = $candidateWeights;
+                $bestError = $candidateError;
+            }
+
+            // Cooling schedule: kurangi learning rate perlahan agar konvergen
+            if ($i % 500 == 0) {
+                $learningRate *= 0.90;
+            }
+        }
+
+        return [
+            'weights' => $bestWeights,
+            'xi' => $bestError
+        ];
+    }
+
+    /**
+     * Fungsi Objektif: Menghitung Maksimum Error (Xi) dari set bobot saat ini.
+     * Mengimplementasikan constraints dari Rumus 2.3 Laporan.
+     */
+    private function calculateMaxError($weights, $bestCode, $worstCode, $bestToOthers, $othersToWorst)
+    {
+        $maxError = 0;
+        $wBest = $weights[$bestCode];
+        $wWorst = $weights[$worstCode];
+
+        // Constraint 1: |wB - aBj * wj| <= xi * wj
+        // Error terstandarisasi: |(wB / wj) - aBj| (Non-linear Input Based)
+        // Atau jika mengikuti text formula 2.3 mutlak: |wB - aBj * wj| / wj
+        foreach ($bestToOthers as $j => $aBj) {
+            $wj = $weights[$j];
+            if ($wj == 0) continue; // Hindari division by zero
+
+            // Menggunakan bentuk Absolute Error Relative (sesuai interpretasi umum Formula 2.3 yang ada wj di ruas kanan)
+            // |wB - aBj * wj| / wj  <= xi
+            $error = abs($wBest - ($aBj * $wj)) / $wj;
+
+            if ($error > $maxError) {
+                $maxError = $error;
+            }
+        }
+
+        // Constraint 2: |wj - ajW * wW| <= xi * wW
+        // Error terstandarisasi: |(wj / wW) - ajW|
+        foreach ($othersToWorst as $j => $ajW) {
+            $wj = $weights[$j];
+
+            // |wj - ajW * wW| / wW <= xi
+            // Asumsi wWorst tidak 0 (karena ini kriteria terburuk, bobotnya pasti > 0)
+            if ($wWorst == 0) $wWorst = 0.0001;
+
+            $error = abs($wj - ($ajW * $wWorst)) / $wWorst;
+
+            if ($error > $maxError) {
+                $maxError = $error;
+            }
+        }
+
+        return $maxError;
     }
 
     /**
@@ -94,12 +184,9 @@ class BwmService
      */
     private function getConsistencyIndex($scale)
     {
-        // Pastikan scale integer dan dalam range 1-9
         $scale = intval($scale);
-        
         if ($scale < 1) return 0.00;
-        if ($scale > 9) return 5.23; // Nilai max
-
-        return $this->consistencyIndexTable[$scale];
+        if ($scale > 9) return 5.23;
+        return $this->consistencyIndexTable[$scale] ?? 5.23;
     }
 }
