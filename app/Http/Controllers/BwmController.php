@@ -127,30 +127,32 @@ class BwmController extends Controller
         }
         $kriterias = $query->get();
 
-        $rawWeights = [];
+        // C. Hitung Bobot Menggunakan Solver Optimasi BWM (Sesuai Proposal)
+        // Panggil service untuk melakukan iterasi pencarian bobot optimal (Xi min-max)
+        $calculationResult = $this->bwmService->calculate(
+            (string)$bestId,       // ID Best Kriteria
+            (string)$worstId,      // ID Worst Kriteria
+            $bestToOthers,         // Array [id => nilai]
+            $othersToWorst         // Array [id => nilai]
+        );
 
-        // C. Hitung Raw Weight (Bobot Mentah) untuk setiap Kriteria
-        foreach ($kriterias as $k) {
-            $id = $k->id;
-            if ($id === $bestId) {
-                $rawWeights[$id] = 1.0;
-            } elseif ($id === $worstId) {
-                $rawWeights[$id] = 1.0 / $val_BestToWorst;
-            } else {
-                $val_BestVsThis = isset($bestToOthers[$id]) ? (int)$bestToOthers[$id] : 1;
-                $w1 = 1.0 / $val_BestVsThis;
-                $val_ThisVsWorst = isset($othersToWorst[$id]) ? (int)$othersToWorst[$id] : 1;
-                $w2 = $val_ThisVsWorst / $val_BestToWorst;
-                $rawWeights[$id] = ($w1 + $w2) / 2;
-            }
-        }
+        // Ambil hasil dari service
+        $finalWeights = $calculationResult['weights'];
+        $cr = $calculationResult['consistency_ratio']; // Bisa disimpan ke DB jika perlu
+        $xi = $calculationResult['xi'];
 
-        // D. Normalisasi Bobot (Agar Total = 1.0)
-        // Rumus: Bobot Akhir = Bobot Mentah / Total Bobot Mentah
-        $totalRawScore = array_sum($rawWeights);
-        $finalWeights = [];
-        foreach ($rawWeights as $id => $val) {
-            $finalWeights[$id] = $totalRawScore > 0 ? ($val / $totalRawScore) : 0;
+        // Validasi Konsistensi (Opsional: Bisa return error jika tidak konsisten)
+//         if (!$calculationResult['is_consistent']) {
+//              return back()->withErrors(['msg' => 'Data tidak konsisten (CR > 0.10). Silakan input ulang.']);
+//         }
+
+        if ($cr > 0.10) {
+            return back()->with([
+                'error' => "Data TIDAK KONSISTEN. Nilai CR anda: {$cr} (Harus di bawah 0.10). Silakan perbaiki perbandingan angka anda agar lebih logis.",
+                // Opsional: kembalikan inputan user biar gak ngetik ulang dari 0
+                'old_best_to_others' => $bestToOthers,
+                'old_others_to_worst' => $othersToWorst
+            ]);
         }
 
         // ---------------------------------------------------------

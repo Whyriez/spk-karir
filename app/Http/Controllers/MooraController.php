@@ -278,104 +278,108 @@ class MooraController extends Controller
         }
         // ---------------------------------------------------
 
-        // D. Hitung Pembagi Normalisasi (MOORA)
+        // ---------------------------------------------------------------------
+        // D. Hitung Pembagi Normalisasi (MOORA) dengan VIRTUAL BASELINE
+        // ---------------------------------------------------------------------
         $divisors = [];
-        // Rumus 3.1: Akar Kuadrat dari Jumlah Kuadrat (Sqrt of Sum Squares)
-//        foreach (array_keys($finalWeights) as $kId) {
-//            $sumSquares = $allNilai->where('kriteria_id', $kId)
-//                ->sum(fn($row) => pow($row->nilai_input, 2));
-//
-//            $divisors[$kId] = sqrt($sumSquares);
-//        }
 
-        //Rumus Max Normalization
-        foreach ($finalWeights as $kId => $bobot) {
+        foreach (array_keys($finalWeights) as $kId) {
             $kriteria = Kriteria::find($kId);
 
-            // Tentukan pembagi statis berdasarkan tipe input
+            // 1. Tentukan Nilai Max & Min Ideal berdasarkan tipe input
+            // Ini bertindak sebagai "Jangkar" agar nilai tidak melambung
+            $virtualMax = 0;
+            $virtualMin = 0;
+
             if ($kriteria->tipe_input == 'number') {
-                // Asumsi nilai rapor max 100
-                $divisors[$kId] = 100;
-            } elseif ($kriteria->tipe_input == 'select' || $kriteria->tipe_input == 'likert') {
-                // Asumsi skala likert max 5
-                $divisors[$kId] = 5;
+                // Skala Rapor (0-100)
+                $virtualMax = 100;
+                $virtualMin = 0;
             } else {
-                // Fallback ke rumus asli jika ragu
-                $sumSquares = $allNilai->where('kriteria_id', $kId)->sum(fn($row) => pow($row->nilai_input, 2));
-                $divisors[$kId] = sqrt($sumSquares);
+                // Skala Likert (1-5) atau Kuesioner
+                $virtualMax = 5;
+                $virtualMin = 1;
             }
+
+            // 2. Ambil nilai real dari database (Siswa Asli)
+            $nilaiRealSiswa = $allNilai->where('kriteria_id', $kId);
+
+            // 3. Hitung Sum Squares Campuran (Real + Virtual)
+            // Rumus: Sum(X_real^2) + (X_max^2) + (X_min^2)
+            $sumSquaresReal = $nilaiRealSiswa->sum(fn($row) => pow($row->nilai_input, 2));
+            $sumSquaresVirtual = pow($virtualMax, 2) + pow($virtualMin, 2);
+
+            $totalSumSquares = $sumSquaresReal + $sumSquaresVirtual;
+
+            // 4. Akar Kuadrat
+            $divisors[$kId] = sqrt($totalSumSquares);
         }
 
-        // E. Ambil Nilai User yang Login
-        $userNilai = NilaiSiswa::where('siswa_id', $userId)
-            ->where('periode_id', $periode->id)
+        // ---------------------------------------------------------------------
+        // E. & F. Hitung Skor (Looping ke SEMUA SISWA agar Ranking Update)
+        // ---------------------------------------------------------------------
+        // Kita wajib update skor semua siswa karena 'divisor' berubah setiap ada data baru
+        $siswaIds = NilaiSiswa::where('periode_id', $periode->id)
             ->where('tingkat_kelas', $tingkatKelas)
-            ->get();
+            ->pluck('siswa_id')
+            ->unique();
 
-        if ($userNilai->isEmpty()) return;
+        foreach ($siswaIds as $sId) {
+            // Ambil nilai spesifik siswa ini
+            $nilaiSiSiswa = $allNilai->where('siswa_id', $sId);
 
-        // F. Hitung Skor Akhir (Yi)
-        $yStudi = 0;
-        $yKerja = 0;
-        $yWirausaha = 0;
+            if ($nilaiSiSiswa->isEmpty()) continue;
 
-        // Helper untuk mapping Kode Kriteria (K1, K2...) ke ID
-        // Karena $finalWeights kuncinya ID, tapi logic if pakai Kode (C1, C2)
-        // Kita butuh map ID -> Kode
-        $kriteriaMap = Kriteria::pluck('kode', 'id')->toArray(); // [1 => 'C1', 2 => 'C2']
+            $yStudi = 0;
+            $yKerja = 0;
+            $yWirausaha = 0;
 
-        foreach ($userNilai as $n) {
-            $kId = $n->kriteria_id;
+            // Map ID Kriteria ke Kode (C1, C2...)
+            // Sebaiknya query ini ditaruh di luar loop biar hemat query
+            $kriteriaMap = Kriteria::pluck('kode', 'id')->toArray();
 
-            // Pastikan bobot untuk kriteria ini ada (jika tidak ada, skip/anggap 0)
-            if (!isset($finalWeights[$kId])) continue;
+            foreach ($nilaiSiSiswa as $n) {
+                $kId = $n->kriteria_id;
+                if (!isset($finalWeights[$kId])) continue;
 
-            $kode = $kriteriaMap[$kId] ?? '';
-            $bobot = $finalWeights[$kId];
-            $divisor = (isset($divisors[$kId]) && $divisors[$kId] > 0) ? $divisors[$kId] : 1;
+                $kode = $kriteriaMap[$kId] ?? '';
+                $bobot = $finalWeights[$kId];
+                $divisor = $divisors[$kId]; // Divisor yang sudah distabilkan
 
-            // Rumus MOORA: (Nilai / Akar Kuadrat) * Bobot
-            $normalizedValue = ($n->nilai_input / $divisor) * $bobot;
+                // Rumus MOORA Normalisasi
+                $normalizedValue = ($n->nilai_input / $divisor) * $bobot;
 
-            // Logika Pengelompokan Alternatif (Sesuai Proposal)
-            // Pastikan kode C1, C2 dst sesuai database Anda
-            // Alternatif: MELANJUTKAN STUDI
-            // Proposal: Akademik(C1), Minat Studi(C2), Ekonomi(C4), Motivasi(C5), Lapangan Kerja(C6)
-            if (in_array($kode, ['C1', 'C2', 'C4', 'C5', 'C6'])) $yStudi += $normalizedValue;
+                // Penjumlahan ke Alternatif (Sesuai Proposal)
+                if (in_array($kode, ['C1', 'C2', 'C4', 'C5', 'C6'])) $yStudi += $normalizedValue;
+                if (in_array($kode, ['C1', 'C3', 'C5', 'C6'])) $yKerja += $normalizedValue;
+                if (in_array($kode, ['C1', 'C4', 'C5', 'C7', 'C8'])) $yWirausaha += $normalizedValue;
+            }
 
-            // Alternatif: BEKERJA
-            // Proposal: Akademik(C1), Minat Kerja(C3), Motivasi(C5), Lapangan Kerja(C6)
-            if (in_array($kode, ['C1', 'C3', 'C5', 'C6'])) $yKerja += $normalizedValue;
+            // G. Tentukan Keputusan Terbaik
+            $scores = [
+                'Melanjutkan Studi' => $yStudi,
+                'Bekerja' => $yKerja,
+                'Berwirausaha' => $yWirausaha
+            ];
+            // Cari skor tertinggi
+            $bestDecision = array_keys($scores, max($scores))[0];
 
-            // Alternatif: WIRAUSAHA
-            // Proposal: Akademik(C1), Ekonomi(C4), Motivasi(C5), Minat Usaha(C7), Modal(C8)
-            if (in_array($kode, ['C1', 'C4', 'C5', 'C7', 'C8'])) $yWirausaha += $normalizedValue;
+            // H. Simpan Hasil
+            HasilRekomendasi::updateOrCreate(
+                [
+                    'siswa_id' => $sId,
+                    'periode_id' => $periode->id,
+                    'tingkat_kelas' => $tingkatKelas
+                ],
+                [
+                    'skor_studi' => $yStudi,
+                    'skor_kerja' => $yKerja,
+                    'skor_wirausaha' => $yWirausaha,
+                    'keputusan_terbaik' => $bestDecision,
+                    'tingkat_kelas' => $tingkatKelas,
+                    'tanggal_hitung' => now(),
+                ]
+            );
         }
-
-        // G. Tentukan Keputusan Terbaik
-        $scores = [
-            'Melanjutkan Studi' => $yStudi,
-            'Bekerja' => $yKerja,
-            'Berwirausaha' => $yWirausaha
-        ];
-
-        $bestDecision = array_keys($scores, max($scores))[0];
-
-        // H. Simpan Hasil
-        HasilRekomendasi::updateOrCreate(
-            [
-                'siswa_id' => $userId,
-                'periode_id' => $periode->id,
-                'tingkat_kelas' => $tingkatKelas
-            ],
-            [
-                'skor_studi' => $yStudi,
-                'skor_kerja' => $yKerja,
-                'skor_wirausaha' => $yWirausaha,
-                'keputusan_terbaik' => $bestDecision,
-                'tingkat_kelas' => $tingkatKelas,
-                'tanggal_hitung' => now(),
-            ]
-        );
     }
 }
